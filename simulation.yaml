@@ -1,0 +1,31 @@
+# PyVISA looks for version info
+spec: "1.1"
+# 1. Define the device blueprint and its command behavior
+devices:
+  mock_instrument:
+    eom:
+      TCPIP SOCKET:
+        q: "\n"
+        r: "\n"
+    attributes:
+      TERMCHAR: "\n"
+    commands:
+      "*IDN?": "MockCorp,Model-999,SERIAL123,v1.0"
+      "*RST": "OK"
+      "SOURCE:VOLTAGE?":
+        value: "0.00"
+      "SOURCE:VOLTAGE {:g}":
+        device_value: "SOURCE:VOLTAGE?"
+      "OUTPUT?":
+        value: "OFF"
+      "OUTPUT {:s}":
+        device_value: "OUTPUT?"
+
+      # Hardcoded static baseline for current measurement to test initialization
+      "MEASURE:CURRENT?": "1.234"
+
+# 2. Bind the resource address to your defined device structure
+resources:
+  # Standard VISA Ethernet format: TCPIP[board]::host address[::LAN device name]::INSTR
+  TCPIP0::192.168.1.100::5025::SOCKET:
+    device: mock_instrument
