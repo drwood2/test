@@ -1,0 +1,19 @@
+name: PR Hardware Verification
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  hardware-test:
+    # Target your physical lab benches
+    runs-on: [self-hosted, hardware-testbed]
+
+    steps:
+      - name: Check out PR code
+        uses: actions/checkout@v4
+
+      - name: Execute Makefile targets
+        run: |
+          # Replace 'test' with whatever target name you have in your Makefile
+          make test 
