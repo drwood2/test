@@ -7,7 +7,7 @@ class iTechPowerSupply(scpi.Instrument):
         super().__init__(
             port=resource_string,
             backend=backend,
-            port_match=False,  # list_resources() only reports ::INSTR, never ::SOCKET
+            port_match=False,  # disabling necessary for pyvisa-sim support
             timeout=5000,
             read_termination='\n',
             write_termination='\n'
