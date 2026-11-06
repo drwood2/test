@@ -1,31 +1,39 @@
-# PyVISA looks for version info
 spec: "1.1"
-# 1. Define the device blueprint and its command behavior
+
+# 1. Define the simulated device and how it responds to SCPI commands
 devices:
-  mock_instrument:
+  mock_power_supply:
     eom:
       TCPIP SOCKET:
         q: "\n"
         r: "\n"
-    attributes:
-      TERMCHAR: "\n"
-    commands:
-      "*IDN?": "MockCorp,Model-999,SERIAL123,v1.0"
-      "*RST": "OK"
-      "SOURCE:VOLTAGE?":
-        value: "0.00"
-      "SOURCE:VOLTAGE {:g}":
-        device_value: "SOURCE:VOLTAGE?"
-      "OUTPUT?":
-        value: "OFF"
-      "OUTPUT {:s}":
-        device_value: "OUTPUT?"
+    error: ERROR
+    dialogues:
+      - q: "*IDN?"
+        r: "MockCorp,Model-999,SERIAL123,v1.0"
+      - q: "*RST"
+      - q: "MEASURE:CURRENT?"
+        r: "1.234"
+    properties:
+      voltage:
+        default: 0.0
+        getter:
+          q: "SOURCE:VOLTAGE?"
+          r: "{:.2f}"
+        setter:
+          q: "SOURCE:VOLTAGE {:g}"
+      output:
+        default: "OFF"
+        getter:
+          q: "OUTPUT?"
+          r: "{:s}"
+        setter:
+          q: "OUTPUT {:s}"
+        specs:
+          valid: ["ON", "OFF"]
+          type: str
 
-      # Hardcoded static baseline for current measurement to test initialization
-      "MEASURE:CURRENT?": "1.234"
-
-# 2. Bind the resource address to your defined device structure
+# 2. Bind the virtual resource address to the device above
 resources:
-  # Standard VISA Ethernet format: TCPIP[board]::host address[::LAN device name]::INSTR
   TCPIP0::192.168.1.100::5025::SOCKET:
-    device: mock_instrument
+    device: mock_power_supply
