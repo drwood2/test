@@ -6,5 +6,5 @@ https://github.com/drwood2/test
 ### origin/easy-pyvisa
 add easy-pyvisa and pyvisa-sim fixes made with Claude
 
-### github-workflows-setup
-add largely boilerplate info to ci.yml to support local CI using Github Actions 
+### origin/github-workflows-setup
+add largely boilerplate info to .github/workflows/ci.yml to support local CI using Github Actions 
