@@ -4,8 +4,7 @@ import pytest
 
 from drivers.iTechAC.iTechAC import iTechACPowerSupply
 
-SIMULATION_FILE = Path(__file__).resolve().parents[1] / "drivers" / "iTechAC" / "simulation.yaml"
-SIMULATED_BACKEND = f"{SIMULATION_FILE}@sim"
+SIMULATED_BACKEND = f"{Path(__file__).with_name('simulation.yaml')}@sim"
 SIMULATED_RESOURCE = "TCPIP0::192.168.1.100::5025::SOCKET"
 
 

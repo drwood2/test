@@ -1,11 +1,6 @@
 import os
-import sys
-
-# Make the repo root importable, regardless of the working directory
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from drivers.iTech.iTech import iTechPowerSupply
-
 
 class iTechACPowerSupply(iTechPowerSupply):
     VALID_MODES = ("AC", "DC")

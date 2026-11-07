@@ -1,0 +1,11 @@
+easy-scpi==0.1.7
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pytest==9.2.0
+PyVISA==1.16.2
+PyVISA-sim==0.7.1
+PyYAML==6.0.3
+stringparser==0.7
+typing_extensions==4.16.0
