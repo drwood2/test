@@ -8,3 +8,6 @@ add easy-pyvisa and pyvisa-sim fixes made with Claude
 
 ### origin/github-workflows-setup
 add largely boilerplate info to .github/workflows/ci.yml to support local CI using Github Actions 
+
+### origin/simulated-tests
+add separate test profile to tests/ directory
