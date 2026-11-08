@@ -9,8 +9,10 @@ devices:
         r: "\n"
     error: ERROR
     dialogues:
+      # Representative IT7900EP reply, in the format the IT7900P Programming Guide documents:
+      # manufacturer, model, serial number, then firmware versions
       - q: "*IDN?"
-        r: "MockCorp,Model-999,SERIAL123,v1.0"
+        r: "Itech Electronics,IT7942EP-350-210,800000000000000002,000.001.038,83.R,13.R"
       - q: "*RST"
       - q: "MEASURE:CURRENT?"
         r: "1.234"
@@ -21,6 +23,28 @@ devices:
       # The guide does not document this response, so "0" is a stand-in
       - q: "SURGESAG:STATE?"
         r: "0"
+      # Three-phase measurements. Without a phase argument, a three-phase instrument
+      # replies with A, B and C values, as MEASURE:VOLTAGE? does here.
+      - q: "MEASURE:VOLTAGE?"
+        r: "220.10,219.90,220.30"
+      - q: "MEASURE:VOLTAGE? A"
+        r: "220.10"
+      - q: "MEASURE:VOLTAGE? B"
+        r: "219.90"
+      - q: "MEASURE:VOLTAGE? C"
+        r: "220.30"
+      - q: "MEASURE:CURRENT? A"
+        r: "1.10"
+      - q: "MEASURE:CURRENT? B"
+        r: "1.20"
+      - q: "MEASURE:CURRENT? C"
+        r: "1.30"
+      - q: "MEASURE:LTLVOLTAGE? BA"
+        r: "381.20"
+      - q: "MEASURE:LTLVOLTAGE? CA"
+        r: "381.00"
+      - q: "MEASURE:LTLVOLTAGE? CB"
+        r: "380.90"
     properties:
       voltage:
         default: 0.0
@@ -29,6 +53,8 @@ devices:
           r: "{:.2f}"
         setter:
           q: "SOURCE:VOLTAGE {:g}"
+        specs:
+          type: float
       output:
         default: "OFF"
         getter:
@@ -57,7 +83,7 @@ devices:
         default: 50.0
         getter:
           q: "FREQUENCY?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "FREQUENCY {:g}"
         specs:
@@ -76,7 +102,7 @@ devices:
         default: 0.0
         getter:
           q: "OUTPUT:IMPEDANCE:RESISTANCE:LEVEL?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "OUTPUT:IMPEDANCE:RESISTANCE:LEVEL {:g}"
         specs:
@@ -85,7 +111,7 @@ devices:
         default: 0.0
         getter:
           q: "OUTPUT:IMPEDANCE:INDUCTANCE:LEVEL?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "OUTPUT:IMPEDANCE:INDUCTANCE:LEVEL {:g}"
         specs:
@@ -124,7 +150,7 @@ devices:
         default: 0.0
         getter:
           q: "SURGESAG:PHASE:START?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "SURGESAG:PHASE:START {:g}"
         specs:
@@ -133,7 +159,7 @@ devices:
         default: 0.0
         getter:
           q: "SURGESAG:PHASE:WIDTH?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "SURGESAG:PHASE:WIDTH {:g}"
         specs:
@@ -180,7 +206,7 @@ devices:
         default: 0.0
         getter:
           q: "SURGESAG:VALUE:PERCENT?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "SURGESAG:VALUE:PERCENT {:g}"
         specs:
@@ -189,9 +215,98 @@ devices:
         default: 0.0
         getter:
           q: "SURGESAG:VALUE?"
-          r: "{:g}"
+          r: "{:.2f}"
         setter:
           q: "SURGESAG:VALUE {:g}"
+        specs:
+          type: float
+      surge_sag_phases:
+        default: "ABC"
+        getter:
+          q: "SURGESAG:PHASE:ENABLE?"
+          r: "{:s}"
+        setter:
+          q: "SURGESAG:PHASE:ENABLE {:s}"
+        specs:
+          valid: ["A", "B", "C", "AB", "AC", "BC", "ABC"]
+          type: str
+      surge_sag_phase_sync:
+        default: "SYNC"
+        getter:
+          q: "SURGESAG:ANGLE:ENABLE?"
+          r: "{:s}"
+        setter:
+          q: "SURGESAG:ANGLE:ENABLE {:s}"
+        specs:
+          valid: ["SYNC", "SPEC"]
+          type: str
+
+      # Three-phase settings from the IT7900P Programming Guide
+      phase_mode:
+        default: "ONE"
+        getter:
+          q: "SYSTEM:FUNCTION?"
+          r: "{:s}"
+        setter:
+          q: "SYSTEM:FUNCTION {:s}"
+        specs:
+          valid: ["ONE", "THREE", "DIFFERENCE", "MULTICHANNEL"]
+          type: str
+      balanced:
+        default: "ON"
+        getter:
+          q: "OUTPUT:BALANCE?"
+          r: "{:s}"
+        setter:
+          q: "OUTPUT:BALANCE {:s}"
+        specs:
+          valid: ["ON", "OFF"]
+          type: str
+      # PVOLTAGE? replies with the phase first, as the guide documents
+      phase_voltage_a:
+        default: 0.0
+        getter:
+          q: "PVOLTAGE? A"
+          r: "A,{:.2f}"
+        setter:
+          q: "PVOLTAGE A,{:g}"
+        specs:
+          type: float
+      phase_voltage_b:
+        default: 0.0
+        getter:
+          q: "PVOLTAGE? B"
+          r: "B,{:.2f}"
+        setter:
+          q: "PVOLTAGE B,{:g}"
+        specs:
+          type: float
+      phase_voltage_c:
+        default: 0.0
+        getter:
+          q: "PVOLTAGE? C"
+          r: "C,{:.2f}"
+        setter:
+          q: "PVOLTAGE C,{:g}"
+        specs:
+          type: float
+      # The guide gives no reply format or defaults for angles; these are stand-ins
+      phase_angle_ba:
+        default: 120.0
+        getter:
+          q: "ANGLE:DIFFERENCE? BA"
+          r: "{:.2f}"
+        setter:
+          q: "ANGLE:DIFFERENCE BA,{:g}"
+        specs:
+          type: float
+      phase_angle_ca:
+        default: 240.0
+        getter:
+          q: "ANGLE:DIFFERENCE? CA"
+          r: "{:.2f}"
+        setter:
+          q: "ANGLE:DIFFERENCE CA,{:g}"
         specs:
           type: float
 

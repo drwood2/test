@@ -9,8 +9,10 @@ devices:
         r: "\n"
     error: ERROR
     dialogues:
+      # Representative IT6600C reply, in the format the ITECH programming guides document:
+      # manufacturer, model, serial number, then firmware versions
       - q: "*IDN?"
-        r: "MockCorp,Model-999,SERIAL123,v1.0"
+        r: "Itech Electronics,IT6642C-1200-200,800000000000000001,000.001.038,83.R,13.R"
       - q: "*RST"
       - q: "MEASURE:CURRENT?"
         r: "1.234"
@@ -22,6 +24,8 @@ devices:
           r: "{:.2f}"
         setter:
           q: "SOURCE:VOLTAGE {:g}"
+        specs:
+          type: float
       output:
         default: "OFF"
         getter:

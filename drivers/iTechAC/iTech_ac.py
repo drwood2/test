@@ -1,6 +1,11 @@
 import os
+import re
 
 from drivers.iTech.iTech import ITechPowerSupply
+
+
+class UnsupportedInstrumentError(RuntimeError):
+    """Raised when the connected instrument is not a model the driver supports."""
 
 
 class _Choice:
@@ -26,6 +31,7 @@ class _Choice:
 
 
 def _number(value):
+    """"""
     return str(float(value))
 
 
@@ -47,6 +53,20 @@ def _parse_integer(response):
     return int(float(response))
 
 
+def _parse_tagged_number(response):
+    """Parses a reply that may repeat the phase first, such as "B,300.0" for PVOLtage? B."""
+    return float(response.split(",")[-1])
+
+
+def _parse_single_number(response, command):
+    values = response.split(",")
+    if len(values) != 1:
+        raise ValueError(
+            f"{command} returned {len(values)} values ({response.strip()!r}), as it does in "
+            "three-phase mode; pass a phase, such as phase='A'")
+    return float(values[0])
+
+
 def _scpi_property(command, doc, to_scpi, from_scpi):
     """Builds a property that sends "<command> <value>" and queries "<command>?"."""
 
@@ -60,6 +80,12 @@ def _scpi_property(command, doc, to_scpi, from_scpi):
 
 
 _OUTPUT_MODE = _Choice("AC", "DC", "ACDC", "DCAC")
+_PHASE_MODE = _Choice("ONE", "THRee", "DIFFerence", "MULTichannel")
+_PHASE = _Choice("A", "B", "C")
+_ANGLE_PAIR = _Choice("BA", "CA")
+_LINE_PAIR = _Choice("BA", "CA", "CB")
+_SURGE_SAG_PHASES = _Choice("A", "B", "C", "AB", "AC", "BC", "ABC")
+_SURGE_SAG_PHASE_SYNC = _Choice("SYNC", "SPEC")
 _SURGE_SAG_MODE = _Choice("PERiod", "TRIG")
 _SURGE_SAG_ACTION = _Choice("IMMediate", "PHASe")
 _SURGE_SAG_TRIGGER_SOURCE = _Choice("IMMediate", "MANual", "BUS", "TRIG1", "TRIG2")
@@ -71,10 +97,95 @@ class ITechACPowerSupply(ITechPowerSupply):
     Extension of ITechPowerSupply which includes AC-specific modes and commanding, intended for IT7900EP.
 
     Grid simulation commands are taken from the IT7900P Series Programming Guide V1.0
-    (Manuals/IT7900P_Programming_Guide-EN.pdf) and address a single-phase output. The
-    optional phase and channel arguments for three-phase and multi-channel use are not
-    exposed. Surge/Sag is not supported in multi-channel mode.
+    (Manuals/IT7900P_Programming_Guide-EN.pdf).
+
+    Single-phase and three-phase operation are supported. In three-phase mode, settings
+    without a phase argument, such as voltage, frequency and the output impedance, apply
+    to all three phases; use the phase methods to address one phase. Multi-channel mode's
+    channel arguments are not exposed, and Surge/Sag is not supported in that mode.
+
+    connect() checks the *IDN? reply and raises UnsupportedInstrumentError, after
+    disconnecting, unless the instrument is an IT7900EP series model.
     """
+    # Matches models such as IT7942EP-350-210, but not IT7900P models such as IT7942P-350-210
+    SUPPORTED_MODEL = re.compile(r"IT79\d\dEP(-|$)")
+
+    @classmethod
+    def is_supported(cls, identity):
+        """Returns whether an *IDN? reply identifies an IT7900EP series instrument."""
+        fields = identity.split(",")
+        return len(fields) > 1 and cls.SUPPORTED_MODEL.match(fields[1].strip()) is not None
+
+    def connect(self):
+        """Connects, then raises UnsupportedInstrumentError unless the instrument is an IT7900EP."""
+        super().connect()
+        identity = self.id
+        if not self.is_supported(identity):
+            self.disconnect()
+            raise UnsupportedInstrumentError(
+                f"{type(self).__name__} supports IT7900EP series instruments only, "
+                f"but *IDN? returned {identity.strip()!r}")
+
+    # --- Phase configuration (guide chapters 4 and 12) ---
+
+    phase_mode = _scpi_property(
+        "SYSTEM:FUNCTION",
+        "Power supply phase mode: 'ONE' (single-phase), 'THREE' (three-phase), "
+        "'DIFFERENCE' (reverse phase) or 'MULTICHANNEL'. *RST: ONE.",
+        _PHASE_MODE, _PHASE_MODE)
+
+    balanced = _scpi_property(
+        "OUTPUT:BALANCE",
+        "In three-phase mode, whether the phases are balanced (True) or can be set "
+        "separately (False). Phase angles only take effect when unbalanced.",
+        _on_off, _parse_bool)
+
+    def phase_voltage(self, phase):
+        """Queries the AC voltage setpoint of phase 'A', 'B' or 'C', in volts."""
+        return _parse_tagged_number(self.query(f"PVOLTAGE? {_PHASE(phase)}"))
+
+    def set_phase_voltage(self, phase, volts):
+        """Sets the AC voltage of phase 'A', 'B' or 'C', in volts."""
+        self.write(f"PVOLTAGE {_PHASE(phase)},{_number(volts)}")
+
+    def phase_angle(self, pair):
+        """Queries the angle of phase B ('BA') or C ('CA') relative to phase A, in degrees."""
+        return _parse_tagged_number(self.query(f"ANGLE:DIFFERENCE? {_ANGLE_PAIR(pair)}"))
+
+    def set_phase_angle(self, pair, degrees):
+        """Sets the angle of phase B ('BA') or C ('CA') relative to phase A, in degrees.
+
+        Only takes effect in three-phase mode with balanced set to False.
+        """
+        self.write(f"ANGLE:DIFFERENCE {_ANGLE_PAIR(pair)},{_number(degrees)}")
+
+    # --- Measurements (guide chapter 14) ---
+
+    def read_voltage(self, phase=None):
+        """Measures the RMS output voltage, in volts.
+
+        In three-phase mode, pass phase 'A', 'B' or 'C'. Without a phase, the instrument
+        replies with all three values, and this raises ValueError.
+        """
+        return self._read_phase_value("MEASURE:VOLTAGE?", phase)
+
+    def read_current(self, phase=None):
+        """Measures the RMS output current, in amps.
+
+        In three-phase mode, pass phase 'A', 'B' or 'C'. Without a phase, the instrument
+        replies with all three values, and this raises ValueError.
+        """
+        return self._read_phase_value("MEASURE:CURRENT?", phase)
+
+    def read_line_voltage(self, pair):
+        """Measures the line-to-line voltage between phases 'BA', 'CA' or 'CB', in volts."""
+        return float(self.query(f"MEASURE:LTLVOLTAGE? {_LINE_PAIR(pair)}"))
+
+    def _read_phase_value(self, command, phase):
+        if phase is not None:
+            command = f"{command} {_PHASE(phase)}"
+        return _parse_single_number(self.query(command), command)
+
     # --- Output mode (guide chapter 11) ---
 
     mode = _scpi_property(
@@ -157,6 +268,18 @@ class ITechACPowerSupply(ITechPowerSupply):
     surge_sag_value = _scpi_property(
         "SURGESAG:VALUE", "Disturbance level in volts. *RST: 0.",
         _number, float)
+
+    surge_sag_phases = _scpi_property(
+        "SURGESAG:PHASE:ENABLE",
+        "In three-phase mode, which phases the surge/sag affects: 'A', 'B', 'C', 'AB', "
+        "'AC', 'BC' or 'ABC'.",
+        _SURGE_SAG_PHASES, _SURGE_SAG_PHASES)
+
+    surge_sag_phase_sync = _scpi_property(
+        "SURGESAG:ANGLE:ENABLE",
+        "In three-phase mode, 'SYNC' starts the surge/sag on all phases together; 'SPEC' "
+        "starts it at each phase's own start angle.",
+        _SURGE_SAG_PHASE_SYNC, _SURGE_SAG_PHASE_SYNC)
 
     def start_surge_sag(self):
         """Starts the surge/sag function, which then runs or waits for its trigger."""

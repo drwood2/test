@@ -19,7 +19,7 @@ class ITechPowerSupply(scpi.Instrument):
     @property
     def voltage(self):
         """Queries the source voltage using easy-scpi property tree mapping."""
-        return self.source.voltage()
+        return float(self.source.voltage())
 
     @voltage.setter
     def voltage(self, volts):
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         print("\n--- Testing Basic Identification ---")
         identity = power_supply.id
         print(f"Instrument IDN: {identity}")
-        assert identity == "MockCorp,Model-999,SERIAL123,v1.0"
+        assert identity == "Itech Electronics,IT6642C-1200-200,800000000000000001,000.001.038,83.R,13.R"
 
         print("\n--- Testing Target Setters & Getters ---")
         power_supply.voltage = 12.5
