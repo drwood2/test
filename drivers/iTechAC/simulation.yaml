@@ -14,6 +14,13 @@ devices:
       - q: "*RST"
       - q: "MEASURE:CURRENT?"
         r: "1.234"
+      # Grid simulation actions from the IT7900P Programming Guide
+      - q: "INITIATE:SURGESAG"
+      - q: "ABORT:SURGESAG"
+      - q: "TRIGGER:FORCE"
+      # The guide does not document this response, so "0" is a stand-in
+      - q: "SURGESAG:STATE?"
+        r: "0"
     properties:
       voltage:
         default: 0.0
@@ -32,17 +39,161 @@ devices:
         specs:
           valid: ["ON", "OFF"]
           type: str
-      # MODE is a dummy command, used until the real SCPI syntax is filled in
+      # Output mode from the IT7900P Programming Guide
       mode:
         default: "AC"
         getter:
-          q: "MODE?"
+          q: "FUNCTION?"
           r: "{:s}"
         setter:
-          q: "MODE {:s}"
+          q: "FUNCTION {:s}"
         specs:
-          valid: ["AC", "DC"]
+          valid: ["AC", "DC", "ACDC", "DCAC"]
           type: str
+
+      # Grid simulation settings from the IT7900P Programming Guide.
+      # Defaults are the guide's *RST values where it gives one, otherwise a stand-in.
+      frequency:
+        default: 50.0
+        getter:
+          q: "FREQUENCY?"
+          r: "{:g}"
+        setter:
+          q: "FREQUENCY {:g}"
+        specs:
+          type: float
+      impedance_enabled:
+        default: "OFF"
+        getter:
+          q: "OUTPUT:IMPEDANCE?"
+          r: "{:s}"
+        setter:
+          q: "OUTPUT:IMPEDANCE {:s}"
+        specs:
+          valid: ["ON", "OFF"]
+          type: str
+      impedance_resistance:
+        default: 0.0
+        getter:
+          q: "OUTPUT:IMPEDANCE:RESISTANCE:LEVEL?"
+          r: "{:g}"
+        setter:
+          q: "OUTPUT:IMPEDANCE:RESISTANCE:LEVEL {:g}"
+        specs:
+          type: float
+      impedance_inductance:
+        default: 0.0
+        getter:
+          q: "OUTPUT:IMPEDANCE:INDUCTANCE:LEVEL?"
+          r: "{:g}"
+        setter:
+          q: "OUTPUT:IMPEDANCE:INDUCTANCE:LEVEL {:g}"
+        specs:
+          type: float
+      surge_sag_mode:
+        default: "PERIOD"
+        getter:
+          q: "SURGESAG:MODE?"
+          r: "{:s}"
+        setter:
+          q: "SURGESAG:MODE {:s}"
+        specs:
+          valid: ["PERIOD", "TRIG"]
+          type: str
+      surge_sag_action:
+        default: "IMMEDIATE"
+        getter:
+          q: "SURGESAG:ACTION?"
+          r: "{:s}"
+        setter:
+          q: "SURGESAG:ACTION {:s}"
+        specs:
+          valid: ["IMMEDIATE", "PHASE"]
+          type: str
+      surge_sag_trigger_source:
+        default: "MANUAL"
+        getter:
+          q: "TRIGGER:SURGESAG:SOURCE?"
+          r: "{:s}"
+        setter:
+          q: "TRIGGER:SURGESAG:SOURCE {:s}"
+        specs:
+          valid: ["IMMEDIATE", "MANUAL", "BUS", "TRIG1", "TRIG2"]
+          type: str
+      surge_sag_start_phase:
+        default: 0.0
+        getter:
+          q: "SURGESAG:PHASE:START?"
+          r: "{:g}"
+        setter:
+          q: "SURGESAG:PHASE:START {:g}"
+        specs:
+          type: float
+      surge_sag_phase_width:
+        default: 0.0
+        getter:
+          q: "SURGESAG:PHASE:WIDTH?"
+          r: "{:g}"
+        setter:
+          q: "SURGESAG:PHASE:WIDTH {:g}"
+        specs:
+          type: float
+      surge_sag_symmetry:
+        default: "OFF"
+        getter:
+          q: "SURGESAG:SYMMETRY?"
+          r: "{:s}"
+        setter:
+          q: "SURGESAG:SYMMETRY {:s}"
+        specs:
+          valid: ["ON", "OFF"]
+          type: str
+      surge_sag_repeat_count:
+        default: 1
+        getter:
+          q: "SURGESAG:REPEAT:COUNT?"
+          r: "{:d}"
+        setter:
+          q: "SURGESAG:REPEAT:COUNT {:d}"
+        specs:
+          type: int
+      surge_sag_period_count:
+        default: 1
+        getter:
+          q: "SURGESAG:PERIOD:COUNT?"
+          r: "{:d}"
+        setter:
+          q: "SURGESAG:PERIOD:COUNT {:d}"
+        specs:
+          type: int
+      surge_sag_value_select:
+        default: "PERCENT"
+        getter:
+          q: "SURGESAG:VALUE:SELECT?"
+          r: "{:s}"
+        setter:
+          q: "SURGESAG:VALUE:SELECT {:s}"
+        specs:
+          valid: ["PERCENT", "SETTING"]
+          type: str
+      surge_sag_percent:
+        default: 0.0
+        getter:
+          q: "SURGESAG:VALUE:PERCENT?"
+          r: "{:g}"
+        setter:
+          q: "SURGESAG:VALUE:PERCENT {:g}"
+        specs:
+          type: float
+      surge_sag_value:
+        default: 0.0
+        getter:
+          q: "SURGESAG:VALUE?"
+          r: "{:g}"
+        setter:
+          q: "SURGESAG:VALUE {:g}"
+        specs:
+          type: float
 
 # 2. Bind the virtual resource address to the device above
 resources:

@@ -1,7 +1,10 @@
 import os
 import easy_scpi as scpi
 
-class iTechPowerSupply(scpi.Instrument):
+class ITechPowerSupply(scpi.Instrument):
+    """
+    Power supply driver intended specifically for high-current power supplies
+    """
     def __init__(self, resource_string, backend=""):
         # An empty backend uses real hardware; "<file>.yaml@sim" uses pyvisa-sim
         super().__init__(
@@ -44,7 +47,7 @@ if __name__ == "__main__":
     SIMULATED_RESOURCE = "TCPIP0::192.168.1.100::5025::SOCKET"
 
     print(f"Initializing virtual interface for: {SIMULATED_RESOURCE}...")
-    power_supply = iTechPowerSupply(SIMULATED_RESOURCE, backend=SIMULATED_BACKEND)
+    power_supply = ITechPowerSupply(SIMULATED_RESOURCE, backend=SIMULATED_BACKEND)
 
     try:
         # Open communication channel
