@@ -1,4 +1,4 @@
-spec: "1.1"
+spec: "1.1" # PyVISA version, specified for PyVISA-sim
 
 # 1. Define the simulated device and how it responds to SCPI commands
 devices:
@@ -46,24 +46,26 @@ devices:
       - q: "MEASURE:LTLVOLTAGE? CB"
         r: "380.90"
     properties:
+      # Three-phase reply, one value per phase, as the bench IT7900EP sends: "277.00,277.00,277.00"
       voltage:
         default: 0.0
         getter:
           q: "SOURCE:VOLTAGE?"
-          r: "{:.2f}"
+          r: "{0:.2f},{0:.2f},{0:.2f}"
         setter:
           q: "SOURCE:VOLTAGE {:g}"
         specs:
           type: float
+      # The IT7900P guide allows a 0|OFF|1|ON reply; this replies 1 or 0, as the IT6600C does
       output:
-        default: "OFF"
+        default: "0"
         getter:
           q: "OUTPUT?"
           r: "{:s}"
         setter:
           q: "OUTPUT {:s}"
         specs:
-          valid: ["ON", "OFF"]
+          valid: ["0", "1"]
           type: str
       # Output mode from the IT7900P Programming Guide
       mode:
@@ -242,8 +244,9 @@ devices:
           type: str
 
       # Three-phase settings from the IT7900P Programming Guide
+      # Starts in three-phase mode, like the bench IT7900EP (*RST is ONE)
       phase_mode:
-        default: "ONE"
+        default: "THREE"
         getter:
           q: "SYSTEM:FUNCTION?"
           r: "{:s}"
@@ -312,5 +315,5 @@ devices:
 
 # 2. Bind the virtual resource address to the device above
 resources:
-  TCPIP0::192.168.1.100::5025::SOCKET:
+  TCPIP0::192.168.200.100::30000::SOCKET:
     device: mock_power_supply

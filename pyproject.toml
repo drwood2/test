@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "itech-drivers"
+version = "0.1.0"
+description = "SCPI drivers for ITECH IT6600C DC and IT7900EP AC power supplies"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "easy-scpi>=0.1.7",
+    "PyVISA>=1.16",
+    "PyVISA-py>=0.8",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9",
+    "PyVISA-sim>=0.7",
+]
+
+[tool.setuptools.packages.find]
+include = ["drivers*"]
+
+[tool.setuptools.package-data]
+"*" = ["simulation.yaml"]

@@ -1,56 +1,19 @@
+"""Driver implementation for iTech IT7900-series AC power supplies"""
 import os
 import re
 
-from drivers.iTech.iTech import ITechPowerSupply
+from drivers.iTech.itech import ITechPowerSupply
+from drivers.scpi_helpers import Choice as _Choice
+from drivers.scpi_helpers import parse_bool as _parse_bool
+from drivers.scpi_helpers import parse_integer as _parse_integer
+from drivers.scpi_helpers import scpi_property as _scpi_property
+from drivers.scpi_helpers import to_integer as _integer
+from drivers.scpi_helpers import to_number as _number
+from drivers.scpi_helpers import to_on_off as _on_off
 
 
 class UnsupportedInstrumentError(RuntimeError):
     """Raised when the connected instrument is not a model the driver supports."""
-
-
-class _Choice:
-    """Validates a SCPI keyword argument and normalizes it to its long form.
-
-    Keywords use the SCPI manual notation, where the upper-case letters are the short
-    form: "PERiod" accepts "PER" or "PERIOD" in any case, and both become "PERIOD".
-    """
-
-    def __init__(self, *keywords):
-        self._long_forms = {}
-        for keyword in keywords:
-            long_form = keyword.upper()
-            short_form = "".join(c for c in keyword if c.isupper() or c.isdigit())
-            self._long_forms[long_form] = long_form
-            self._long_forms[short_form] = long_form
-
-    def __call__(self, value):
-        key = str(value).strip().strip('"').upper()
-        if key not in self._long_forms:
-            raise ValueError(f"must be one of {sorted(set(self._long_forms.values()))}, got {value!r}")
-        return self._long_forms[key]
-
-
-def _number(value):
-    """"""
-    return str(float(value))
-
-
-def _integer(value):
-    if int(value) != value:
-        raise ValueError(f"must be a whole number, got {value!r}")
-    return str(int(value))
-
-
-def _on_off(value):
-    return "ON" if value else "OFF"
-
-
-def _parse_bool(response):
-    return response.strip().upper() in ("1", "ON")
-
-
-def _parse_integer(response):
-    return int(float(response))
 
 
 def _parse_tagged_number(response):
@@ -67,16 +30,18 @@ def _parse_single_number(response, command):
     return float(values[0])
 
 
-def _scpi_property(command, doc, to_scpi, from_scpi):
-    """Builds a property that sends "<command> <value>" and queries "<command>?"."""
+def _unsupported(name, hint):
+    """Replaces an inherited IT6600C setting whose command means something else on the IT7900EP.
 
-    def getter(self):
-        return from_scpi(self.query(f"{command}?"))
+    Reading or setting it raises NotImplementedError before anything is sent. It isn't an
+    AttributeError, because easy_scpi would catch that and send the name as a SCPI command.
+    """
+    message = f"{name} is an IT6600C setting and isn't supported on the IT7900EP; {hint}"
 
-    def setter(self, value):
-        self.write(f"{command} {to_scpi(value)}")
+    def fail(self, *_):
+        raise NotImplementedError(message)
 
-    return property(getter, setter, doc=doc)
+    return property(fail, fail, doc=message)
 
 
 _OUTPUT_MODE = _Choice("AC", "DC", "ACDC", "DCAC")
@@ -125,6 +90,21 @@ class ITechACPowerSupply(ITechPowerSupply):
             raise UnsupportedInstrumentError(
                 f"{type(self).__name__} supports IT7900EP series instruments only, "
                 f"but *IDN? returned {identity.strip()!r}")
+
+    # --- Voltage setpoint (guide chapter 11) ---
+
+    def _query_voltage(self):
+        """Voltage setpoint in volts.
+
+        A float in single-phase mode. In three-phase mode the instrument replies with one
+        value per phase, such as "277.00,277.00,277.00", so this is a tuple of three floats
+        for phases A, B and C. Setting it with one value sets all phases.
+        """
+        values = tuple(float(value) for value in self.query("SOURCE:VOLTAGE?").split(","))
+        return values[0] if len(values) == 1 else values
+
+    # Replaces only the inherited getter, so setting keeps its load_only guard
+    voltage = ITechPowerSupply.voltage.getter(_query_voltage)
 
     # --- Phase configuration (guide chapters 4 and 12) ---
 
@@ -193,6 +173,22 @@ class ITechACPowerSupply(ITechPowerSupply):
         "Output mode: 'AC', 'DC', 'ACDC' or 'DCAC'. Three-phase mode allows only 'AC' "
         "and 'ACDC'. *RST: AC.",
         _OUTPUT_MODE, _OUTPUT_MODE)
+
+    # --- Inherited IT6600C settings that would send FUNCTION or CURRENT commands ---
+    # On the IT7900EP, FUNCTION sets the AC/DC output mode and CURRENT sets the RMS
+    # current limit, so these IT6600C meanings must not reach it.
+
+    priority_mode = _unsupported("priority_mode", "use mode for the AC/DC output mode")
+    only_load_mode = _unsupported("only_load_mode", "the IT7900EP has no only-load mode")
+    current = _unsupported("current", "the IT7900EP's CURRENT command sets an RMS current limit")
+    current_limit = _unsupported("current_limit", "the IT7900EP uses CURRENT:LIMIT:HIGH instead")
+    current_limit_negative = _unsupported(
+        "current_limit_negative", "the IT7900EP uses CURRENT:LIMIT:LOW instead")
+
+    def enter_only_load_mode(self):
+        """Not supported: the IT7900EP has no only-load mode."""
+        raise NotImplementedError(
+            "enter_only_load_mode is an IT6600C command and isn't supported on the IT7900EP")
 
     # --- Grid frequency (guide chapter 11) ---
 
@@ -302,10 +298,11 @@ if __name__ == "__main__":
     # Locate the simulation file next to this script, regardless of the working directory
     sim_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "simulation.yaml")
     SIMULATED_BACKEND = f"{sim_file}@sim"
-    SIMULATED_RESOURCE = "TCPIP0::192.168.1.100::5025::SOCKET"
+    SIMULATED_RESOURCE = "TCPIP0::192.168.200.100::30000::SOCKET"
 
     print(f"Initializing virtual interface for: {SIMULATED_RESOURCE}...")
-    power_supply = ITechACPowerSupply(SIMULATED_RESOURCE, backend=SIMULATED_BACKEND)
+    # load_only=False so the setter checks below can set the voltage
+    power_supply = ITechACPowerSupply(SIMULATED_RESOURCE, backend=SIMULATED_BACKEND, load_only=False)
 
     try:
         # Open communication channel
@@ -315,7 +312,7 @@ if __name__ == "__main__":
         power_supply.voltage = 12.5
         voltage = power_supply.voltage
         print(f"Configured Voltage level: {voltage} V")
-        assert float(voltage) == 12.5
+        assert voltage == (12.5, 12.5, 12.5)  # one value per phase, as in three-phase mode
 
         print("\n--- Testing Output Mode Setter & Getter ---")
         default_mode = power_supply.mode

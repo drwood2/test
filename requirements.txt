@@ -5,6 +5,7 @@ pluggy==1.7.0
 Pygments==2.21.0
 pytest==9.2.0
 PyVISA==1.16.2
+PyVISA-py==0.8.1
 PyVISA-sim==0.7.1
 PyYAML==6.0.3
 stringparser==0.7

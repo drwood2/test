@@ -1,13 +1,14 @@
+"""Test file for iTechAC driver"""
 from pathlib import Path
 
 import pytest
 
-from drivers.iTechAC.iTech_ac import ITechACPowerSupply, UnsupportedInstrumentError
+from drivers.iTechAC.itech_ac import ITechACPowerSupply, UnsupportedInstrumentError
 
 SIMULATED_BACKEND = f"{Path(__file__).with_name('simulation.yaml')}@sim"
 # The parent driver's simulation identifies as an IT6600C
 IT6600C_BACKEND = f"{Path(__file__).parents[1] / 'iTech' / 'simulation.yaml'}@sim"
-SIMULATED_RESOURCE = "TCPIP0::192.168.1.100::5025::SOCKET"
+SIMULATED_RESOURCE = "TCPIP0::192.168.200.100::30000::SOCKET"
 
 
 @pytest.fixture
@@ -46,16 +47,17 @@ def test_is_supported(identity, supported):
 
 def test_enable_ac_mode_then_disable_output(power_supply):
     # Start away from the simulator defaults (AC, OFF) so the checks below prove a change
+    power_supply.load_only = False  # turning the output on needs load_only off
     power_supply.mode = "DC"
     power_supply.output_state = "ON"
     assert power_supply.mode == "DC"
-    assert power_supply.output_state == "ON"
+    assert power_supply.output_state is True
 
     power_supply.mode = "AC"
     assert power_supply.mode == "AC"
 
     power_supply.output_state = "OFF"
-    assert power_supply.output_state == "OFF"
+    assert power_supply.output_state is False
 
 
 @pytest.mark.parametrize("mode", ["DC", "ACDC", "DCAC", "AC"])
@@ -82,8 +84,25 @@ def test_grid_defaults_match_documented_reset_values(power_supply):
     assert power_supply.surge_sag_value == 0.0
 
 
+def test_voltage_reads_one_float_per_phase(power_supply):
+    # The simulator replies like the three-phase bench unit, such as "0.00,0.00,0.00"
+    assert power_supply.voltage == (0.0, 0.0, 0.0)
+
+    power_supply.load_only = False
+    power_supply.voltage = 277
+    voltage = power_supply.voltage
+    assert voltage == (277.0, 277.0, 277.0)
+    assert type(voltage) is tuple
+    assert all(type(volts) is float for volts in voltage)
+
+
+def test_setting_voltage_keeps_the_load_only_guard(power_supply):
+    with pytest.raises(ValueError, match="load_only"):
+        power_supply.voltage = 277
+    assert power_supply.voltage == (0.0, 0.0, 0.0)
+
+
 @pytest.mark.parametrize("name, number_type", [
-    ("voltage", float),
     ("frequency", float),
     ("impedance_resistance", float),
     ("impedance_inductance", float),
@@ -166,10 +185,10 @@ def test_invalid_settings_are_rejected(power_supply, name, value):
 
 
 def test_phase_mode(power_supply):
-    assert power_supply.phase_mode == "ONE"
-
-    power_supply.phase_mode = "THREE"
     assert power_supply.phase_mode == "THREE"
+
+    power_supply.phase_mode = "ONE"
+    assert power_supply.phase_mode == "ONE"
 
     power_supply.phase_mode = "thr"
     assert power_supply.phase_mode == "THREE"
@@ -238,3 +257,37 @@ def test_surge_sag_run_commands(power_supply):
     power_supply.force_trigger()
     assert power_supply.surge_sag_state() == "0"
     power_supply.abort_surge_sag()
+
+
+# --- Inherited IT6600C settings that would send FUNCTION or CURRENT commands ---
+
+@pytest.fixture
+def sent_commands(power_supply, monkeypatch):
+    """Records every command the driver sends, while still sending it to the simulator."""
+    sent = []
+    write, query = power_supply.write, power_supply.query
+    monkeypatch.setattr(power_supply, "write", lambda msg: (sent.append(msg), write(msg))[1])
+    monkeypatch.setattr(power_supply, "query", lambda msg: (sent.append(msg), query(msg))[1])
+    return sent
+
+
+@pytest.mark.parametrize("name, value", [
+    ("priority_mode", "CURRENT"),
+    ("only_load_mode", True),
+    ("current", -10),
+    ("current_limit", 5),
+    ("current_limit_negative", -5),
+])
+def test_it6600c_settings_are_blocked_without_sending_anything(power_supply, sent_commands, name, value):
+    with pytest.raises(NotImplementedError, match="IT7900EP"):
+        getattr(power_supply, name)
+    with pytest.raises(NotImplementedError, match="IT7900EP"):
+        setattr(power_supply, name, value)
+    assert sent_commands == []
+
+
+def test_enter_only_load_mode_is_blocked_without_sending_anything(power_supply, sent_commands):
+    with pytest.raises(NotImplementedError, match="IT7900EP"):
+        power_supply.enter_only_load_mode()
+    assert sent_commands == []
+    assert power_supply.mode == "AC"  # FUNCTION, the AC/DC output mode, is unchanged

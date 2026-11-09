@@ -1,4 +1,4 @@
-spec: "1.1"
+spec: "1.1" # PyVISA version, specified for PyVISA-sim
 
 # 1. Define the simulated device and how it responds to SCPI commands
 devices:
@@ -16,6 +16,10 @@ devices:
       - q: "*RST"
       - q: "MEASURE:CURRENT?"
         r: "1.234"
+      - q: "MEASURE:VOLTAGE?"
+        r: "48.00"
+      - q: "MEASURE:POWER?"
+        r: "59.23"
     properties:
       voltage:
         default: 0.0
@@ -26,18 +30,106 @@ devices:
           q: "SOURCE:VOLTAGE {:g}"
         specs:
           type: float
+      # A real IT6600C replies 1 or 0 to OUTPUT?, so the driver sends 1 or 0
       output:
-        default: "OFF"
+        default: "0"
         getter:
           q: "OUTPUT?"
           r: "{:s}"
         setter:
           q: "OUTPUT {:s}"
         specs:
-          valid: ["ON", "OFF"]
+          valid: ["0", "1"]
           type: str
+
+      # Load simulation settings from the IT6600C Programming Guide. The numeric defaults
+      # are what the bench IT6600C reported; the real unit replies in short form (VOLT,
+      # CURR), which the driver reads the same way.
+      priority_mode:
+        default: "VOLTAGE"
+        getter:
+          q: "FUNCTION?"
+          r: "{:s}"
+        setter:
+          q: "FUNCTION {:s}"
+        specs:
+          valid: ["VOLTAGE", "CURRENT"]
+          type: str
+      only_load_mode:
+        default: "0"
+        getter:
+          q: "FUNCTION:ILOAD?"
+          r: "{:s}"
+        setter:
+          q: "FUNCTION:ILOAD {:s}"
+        specs:
+          valid: ["0", "1"]
+          type: str
+      current:
+        default: 50.0
+        getter:
+          q: "CURRENT?"
+          r: "{:.2f}"
+        setter:
+          q: "CURRENT {:g}"
+        specs:
+          type: float
+      resistance:
+        default: 0.0
+        getter:
+          q: "RESISTANCE?"
+          r: "{:.2f}"
+        setter:
+          q: "RESISTANCE {:g}"
+        specs:
+          type: float
+      power:
+        default: 60000.0
+        getter:
+          q: "POWER?"
+          r: "{:.2f}"
+        setter:
+          q: "POWER {:g}"
+        specs:
+          type: float
+      current_limit:
+        default: 50.0
+        getter:
+          q: "CURRENT:LIMIT?"
+          r: "{:.2f}"
+        setter:
+          q: "CURRENT:LIMIT {:g}"
+        specs:
+          type: float
+      current_limit_negative:
+        default: -5.0
+        getter:
+          q: "CURRENT:LIMIT:NEGATIVE?"
+          r: "{:.2f}"
+        setter:
+          q: "CURRENT:LIMIT:NEGATIVE {:g}"
+        specs:
+          type: float
+      power_limit:
+        default: 60000.0
+        getter:
+          q: "POWER:LIMIT?"
+          r: "{:.2f}"
+        setter:
+          q: "POWER:LIMIT {:g}"
+        specs:
+          type: float
+      power_limit_negative:
+        default: -10000.0
+        getter:
+          q: "POWER:LIMIT:NEGATIVE?"
+          r: "{:.2f}"
+        setter:
+          q: "POWER:LIMIT:NEGATIVE {:g}"
+        specs:
+          type: float
 
 # 2. Bind the virtual resource address to the device above
 resources:
-  TCPIP0::192.168.1.100::5025::SOCKET:
+  TCPIP0::192.168.200.100::30000::SOCKET:
     device: mock_power_supply
