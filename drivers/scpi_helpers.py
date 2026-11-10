@@ -24,7 +24,7 @@ class Choice:
 
 
 def to_number(value):
-    """Validates a number and formats it for a SCPI command."""
+    """Validates a number and formats it for a SCPI read command."""
     return str(float(value))
 
 
